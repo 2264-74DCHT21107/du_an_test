@@ -1,13 +1,12 @@
 ﻿using UnityEngine;
-using static UnityEditor.PlayerSettings;
 
 public class PlayerController : MonoBehaviour
 {
-    public float cellSize = 1f;
+    public float cellSize = 1.2f;
     public Vector2Int gridPos;
     public int Coin = 0;
     public LevelDataSO levelData;
-   
+
     void Start()
     {
         UpdateWorldPosition();
@@ -15,8 +14,9 @@ public class PlayerController : MonoBehaviour
 
     void Update()
     {
-        Vector2Int move = Vector2Int.zero;
+        if (levelData == null) return;
 
+        Vector2Int move = Vector2Int.zero;
         if (Input.GetKeyDown(KeyCode.W)) move = new Vector2Int(0, 1);
         if (Input.GetKeyDown(KeyCode.S)) move = new Vector2Int(0, -1);
         if (Input.GetKeyDown(KeyCode.A)) move = new Vector2Int(-1, 0);
@@ -24,123 +24,105 @@ public class PlayerController : MonoBehaviour
 
         if (move != Vector2Int.zero)
         {
-
-            Vector2Int targetPos = GetFarthestPoint(gridPos, move);
+            Vector2Int targetPos = GetFarthestPointAndCollect(gridPos, move);
 
             if (targetPos != gridPos)
             {
-                gridPos = targetPos; 
+                gridPos = targetPos;
                 UpdateWorldPosition();
-                //checkCollectCoin(gridPos);
-                Debug.Log("Move to: " + gridPos);
-                if(IsAtFinish())
-                {
-                    Debug.Log("Reached the FINISH!");
-                }
+                Debug.Log($"Moved to: {gridPos} | Coins: {Coin}");
             }
             else
             {
-                Debug.Log(" Blocked by WALL");
+                Debug.Log("Blocked by wall or need coin");
             }
         }
     }
-    Vector2Int GetFarthestPoint(Vector2Int startPos, Vector2Int direction)
+
+  
+    Vector2Int GetFarthestPointAndCollect(Vector2Int startPos, Vector2Int direction)
     {
-        Vector2Int currentPos = startPos;
+        Vector2Int current = startPos;
 
         while (true)
         {
-            Vector2Int next  = currentPos + direction;
+            Vector2Int next = current + direction;
 
-            if (!IsWithinBounds(next ))
-                break;  
-            
-            var tile = levelData.grid[next.y].tiles[next .x];
-            if (tile == LevelDataSO.TileType.Coin)
-            {
+            if (!IsWithinBounds(next))
+                break;
+
+            LevelDataSO.TileType tile = levelData.grid[next.y].tiles[next.x];
+
+            if (tile == LevelDataSO.TileType.Wall)
+                break;
+
+          
+            current = next;
+
+           
+            ProcessTile(current);
+
+       
+            if (tile == LevelDataSO.TileType.Finish)
+                break;
+
+           
+            if (tile == LevelDataSO.TileType.NeedCoin && Coin <= 0)
+                break;
+        }
+
+        return current;
+    }
+
+    
+    void ProcessTile(Vector2Int pos)
+    {
+        if (!IsWithinBounds(pos)) return;
+
+        LevelDataSO.TileType tileType = levelData.grid[pos.y].tiles[pos.x];
+
+        switch (tileType)
+        {
+            case LevelDataSO.TileType.Coin:
                 Coin++;
-                levelData.grid[next.y].tiles[next.x] = LevelDataSO.TileType.None;
-                Debug.Log("Collected a coin! Score: " + Coin);
+                levelData.grid[pos.y].tiles[pos.x] = LevelDataSO.TileType.None;
+                Debug.Log($"Collected Coin at {pos}! Total: {Coin}");
+                break;
 
-            }
-            if (tile == LevelDataSO.TileType.NeedCoin)
-            {
+            case LevelDataSO.TileType.NeedCoin:
                 if (Coin > 0)
                 {
                     Coin--;
-                    Debug.Log("Used a coin to pass! Remaining coins: " + Coin);
-                    levelData.grid[next.y].tiles[next.x] = LevelDataSO.TileType.None;
+                    levelData.grid[pos.y].tiles[pos.x] = LevelDataSO.TileType.None;
+                    Debug.Log($"Used 1 Coin at {pos}. Remaining: {Coin}");
                 }
                 else
                 {
-                    Debug.Log("Need a coin to pass!");
-                    break;
+                    Debug.Log("Need a coin to pass this tile!");
                 }
-            }
-            if ( tile == LevelDataSO.TileType.Wall)
                 break;
-            currentPos = next;
-            if (tile == LevelDataSO.TileType.Finish)          
+
+            case LevelDataSO.TileType.Finish:
+                Debug.Log("=== YOU WIN! ===");
                 break;
-            
         }
-        return currentPos;
     }
 
-    bool CanMove(Vector2Int pos)
-    {
-        if (!IsWithinBounds(pos))
-            return false;
-
-        if (levelData.grid[pos.y].tiles[pos.x] == LevelDataSO.TileType.Wall)
-            return false;
-        if (levelData.grid[pos.y].tiles[pos.x] == LevelDataSO.TileType.NeedCoin && Coin <= 0)
-            return false;
-        if (levelData.grid[pos.y].tiles[pos.x] == LevelDataSO.TileType.NeedCoin && Coin > 0)
-        {
-            Coin--;
-            levelData.grid[pos.y].tiles[pos.x] = LevelDataSO.TileType.None;
-            Debug.Log("Used a coin to pass! Remaining coins: " + Coin);
-        }
-        if (levelData.grid[pos.y].tiles[pos.x] == LevelDataSO.TileType.Coin)
-        {
-            Coin++;
-            levelData.grid[pos.y].tiles[pos.x] = LevelDataSO.TileType.None;
-            Debug.Log("Collected a coin! Score: " + Coin);
-        }
-        return true;
-    }
-    bool IsAtFinish()
-    {
-        if (levelData.grid[gridPos.y].tiles[gridPos.x] == LevelDataSO.TileType.Finish)
-            return true;
-
-        return false;
-    }
     bool IsWithinBounds(Vector2Int pos)
     {
-        if (pos.x < 0 || pos.x >= levelData.grid[0].tiles.Count ||
-            pos.y < 0 || pos.y >= levelData.grid.Count)
+        if (levelData == null || levelData.grid == null || levelData.grid.Count == 0)
             return false;
 
-        return true;
+        return pos.x >= 0 && pos.x < levelData.grid[0].tiles.Count &&
+               pos.y >= 0 && pos.y < levelData.grid.Count;
     }
+
     void UpdateWorldPosition()
     {
         transform.position = new Vector3(
             gridPos.x * cellSize,
             0,
-            gridPos.y * cellSize 
+            gridPos.y * cellSize
         );
     }
-
-    //void checkCollectCoin(Vector2Int pos)
-    //{
-    //    if (levelData.grid[pos.y].tiles[pos.x] == LevelDataSO.TileType.Coin)
-    //    {
-    //        Coin++;
-    //        levelData.grid[pos.y].tiles[pos.x] = LevelDataSO.TileType.None;
-    //        Debug.Log("Collected a coin! Score: " + Coin);
-    //    }
-    //}
 }

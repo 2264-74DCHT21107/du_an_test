@@ -11,8 +11,6 @@ public class LeverManager : MonoBehaviour
     public GameObject FinishPreb;
     public GameObject CoinPreb;
     public GameObject NeedCoinPreb;
-
-
     public LevelDataSO levelData;
     public float spacing = 1.2f;
 
@@ -71,6 +69,7 @@ public class LeverManager : MonoBehaviour
 
     void SpawnPlayer()
     {
+        
         if (Player != null)
         {
             GameObject playerObj = (GameObject)UnityEditor.PrefabUtility.InstantiatePrefab(Player);
