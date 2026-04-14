@@ -16,7 +16,7 @@ public class LevelDataSO : ScriptableObject
         Finish,
         Coin,
         NeedCoin,
-
+        RidirectUp,
 
     }
 

@@ -39,7 +39,7 @@ public class PlayerController : MonoBehaviour
         }
     }
 
-  
+ 
     Vector2Int GetFarthestPointAndCollect(Vector2Int startPos, Vector2Int direction)
     {
         Vector2Int current = startPos;
@@ -56,17 +56,17 @@ public class PlayerController : MonoBehaviour
             if (tile == LevelDataSO.TileType.Wall)
                 break;
 
-          
+        
             current = next;
 
-           
+         
             ProcessTile(current);
 
        
             if (tile == LevelDataSO.TileType.Finish)
                 break;
 
-           
+      
             if (tile == LevelDataSO.TileType.NeedCoin && Coin <= 0)
                 break;
         }
@@ -74,18 +74,19 @@ public class PlayerController : MonoBehaviour
         return current;
     }
 
-    
+ 
     void ProcessTile(Vector2Int pos)
     {
         if (!IsWithinBounds(pos)) return;
 
-        LevelDataSO.TileType tileType = levelData.grid[pos.y].tiles[pos.x];
+        var tileList = levelData.grid[pos.y].tiles;
+        LevelDataSO.TileType tileType = tileList[pos.x];
 
         switch (tileType)
         {
             case LevelDataSO.TileType.Coin:
                 Coin++;
-                levelData.grid[pos.y].tiles[pos.x] = LevelDataSO.TileType.None;
+                tileList[pos.x] = LevelDataSO.TileType.None;   
                 Debug.Log($"Collected Coin at {pos}! Total: {Coin}");
                 break;
 
@@ -93,7 +94,7 @@ public class PlayerController : MonoBehaviour
                 if (Coin > 0)
                 {
                     Coin--;
-                    levelData.grid[pos.y].tiles[pos.x] = LevelDataSO.TileType.None;
+                    tileList[pos.x] = LevelDataSO.TileType.None;
                     Debug.Log($"Used 1 Coin at {pos}. Remaining: {Coin}");
                 }
                 else

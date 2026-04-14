@@ -12,13 +12,15 @@ public class LeverManager : MonoBehaviour
     public GameObject CoinPreb;
     public GameObject NeedCoinPreb;
     public LevelDataSO levelData;
+    public GameObject UpPreb;
+
     public float spacing = 1.2f;
 
     void Start()
     {
         SpawnPlayer();
     }
-
+    
     [Button("Generate Level From SO")]
     void GenerateLevel()
     {
@@ -50,6 +52,9 @@ public class LeverManager : MonoBehaviour
                         break;
                     case LevelDataSO.TileType.NeedCoin:
                         prefab = NeedCoinPreb;
+                        break;
+                    case LevelDataSO.TileType.RidirectUp:
+                        prefab = UpPreb;
                         break;
 
                 }
