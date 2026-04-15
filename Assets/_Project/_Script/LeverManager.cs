@@ -12,7 +12,9 @@ public class LeverManager : MonoBehaviour
     public GameObject CoinPreb;
     public GameObject NeedCoinPreb;
     public LevelDataSO levelData;
-    public GameObject UpPreb;
+    public GameObject RedirectUpRightPreb;
+    public GameObject RedirectDownLeftPreb;
+
 
     public float spacing = 1.2f;
 
@@ -20,7 +22,7 @@ public class LeverManager : MonoBehaviour
     {
         SpawnPlayer();
     }
-    
+
     [Button("Generate Level From SO")]
     void GenerateLevel()
     {
@@ -53,8 +55,11 @@ public class LeverManager : MonoBehaviour
                     case LevelDataSO.TileType.NeedCoin:
                         prefab = NeedCoinPreb;
                         break;
-                    case LevelDataSO.TileType.RidirectUp:
-                        prefab = UpPreb;
+                    case LevelDataSO.TileType.RedirectUpRight:
+                        prefab = RedirectUpRightPreb;
+                        break;
+                    case LevelDataSO.TileType.RedirectDownLeft:
+                        prefab = RedirectDownLeftPreb;
                         break;
 
                 }
@@ -70,6 +75,10 @@ public class LeverManager : MonoBehaviour
 
         SpawnPlayer();
 
+        if (PlayerController != null)
+        {
+            PlayerController.ResetState();
+        }
     }
 
     void SpawnPlayer()
@@ -85,6 +94,7 @@ public class LeverManager : MonoBehaviour
             PlayerController.gridPos = new Vector2Int((int)levelData.PlayerPos.x, (int)levelData.PlayerPos.y);
             playerObj.name = "Player";
         }
+        
     }
 
 

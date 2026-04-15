@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using UnityEngine;
 using Sirenix.OdinInspector;
@@ -16,7 +16,9 @@ public class LevelDataSO : ScriptableObject
         Finish,
         Coin,
         NeedCoin,
-        RidirectUp,
+        RedirectUpRight,
+        RedirectDownLeft,
+
 
     }
 
@@ -25,7 +27,7 @@ public class LevelDataSO : ScriptableObject
     {
         public List<TileType> tiles = new List<TileType>();
     }
-
+    
 #if UNITY_EDITOR
     [BoxGroup("Editor Only Settings")]
     [LabelText("Width")]
@@ -60,4 +62,5 @@ public class LevelDataSO : ScriptableObject
     [Title("Level Data")]
     [ListDrawerSettings(Expanded = true)]
     public List<Row> grid = new List<Row>();
+
 }

@@ -1,4 +1,5 @@
-﻿using UnityEngine;
+﻿using System.Collections.Generic;
+using UnityEngine;
 
 public class PlayerController : MonoBehaviour
 {
@@ -6,7 +7,7 @@ public class PlayerController : MonoBehaviour
     public Vector2Int gridPos;
     public int Coin = 0;
     public LevelDataSO levelData;
-
+    public HashSet<Vector2Int> usedTiles = new HashSet<Vector2Int>();
     void Start()
     {
         UpdateWorldPosition();
@@ -60,14 +61,14 @@ public class PlayerController : MonoBehaviour
             current = next;
 
          
-            ProcessTile(current);
+           direction = ProcessTile(current, direction);
 
        
             if (tile == LevelDataSO.TileType.Finish)
                 break;
 
       
-            if (tile == LevelDataSO.TileType.NeedCoin && Coin <= 0)
+            if (tile == LevelDataSO.TileType.NeedCoin && !usedTiles.Contains(next) && Coin <= 0)
                 break;
         }
 
@@ -75,9 +76,10 @@ public class PlayerController : MonoBehaviour
     }
 
  
-    void ProcessTile(Vector2Int pos)
+     Vector2Int ProcessTile(Vector2Int pos, Vector2Int currentDirection)
     {
-        if (!IsWithinBounds(pos)) return;
+        if (!IsWithinBounds(pos))
+            return currentDirection;
 
         var tileList = levelData.grid[pos.y].tiles;
         LevelDataSO.TileType tileType = tileList[pos.x];
@@ -85,28 +87,52 @@ public class PlayerController : MonoBehaviour
         switch (tileType)
         {
             case LevelDataSO.TileType.Coin:
-                Coin++;
-                tileList[pos.x] = LevelDataSO.TileType.None;   
-                Debug.Log($"Collected Coin at {pos}! Total: {Coin}");
+
+          
+                if (!usedTiles.Contains(pos))
+                {
+                    Coin++;
+                    usedTiles.Add(pos);
+                    Debug.Log($"Collected Coin at {pos}! Total: {Coin}");
+                }
                 break;
 
             case LevelDataSO.TileType.NeedCoin:
-                if (Coin > 0)
+
+               
+                if (!usedTiles.Contains(pos))
                 {
-                    Coin--;
-                    tileList[pos.x] = LevelDataSO.TileType.None;
-                    Debug.Log($"Used 1 Coin at {pos}. Remaining: {Coin}");
-                }
-                else
-                {
-                    Debug.Log("Need a coin to pass this tile!");
+                    if (Coin > 0)
+                    {
+                        Coin--;
+                        usedTiles.Add(pos);
+                        Debug.Log($"Used Coin at {pos}. Remaining: {Coin}");
+                    }
+                    else
+                    {
+                        Debug.Log("Need a coin!");
+                    }
                 }
                 break;
 
             case LevelDataSO.TileType.Finish:
-                Debug.Log("=== YOU WIN! ===");
+                Debug.Log(" YOU WIN!");
                 break;
+
+            case LevelDataSO.TileType.RedirectUpRight:
+                Debug.Log($"Up or Right ");
+                if (currentDirection.x != 0)
+                    return new Vector2Int(0, 1);
+                else 
+                    return new Vector2Int(1,0);
+            case LevelDataSO.TileType.RedirectDownLeft:
+                Debug.Log($"Down or Left ");
+                if (currentDirection.x != 0)
+                    return new Vector2Int(0, -1);
+                else
+                    return new Vector2Int(-1, 0);
         }
+        return currentDirection;
     }
 
     bool IsWithinBounds(Vector2Int pos)
@@ -125,5 +151,10 @@ public class PlayerController : MonoBehaviour
             0,
             gridPos.y * cellSize
         );
+    }
+    public void ResetState()
+    {
+        Coin = 0;
+        usedTiles.Clear();
     }
 }
