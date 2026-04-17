@@ -20,19 +20,20 @@ public class LeverManager : MonoBehaviour
     public GameObject RedirectUpLeftPrep;
     public GameObject RedirectDownRightPreb;
 
+
     public float spacing = 1.2f;
 
     [Title("Level Data")]
-    public LevelDataSO levelData;                    // Bản gốc cố định
+    public LevelDataSO levelData;
 
     [ReadOnly]
     [ShowInInspector]
     [Title("Current Level Data (Đang chỉnh sửa)")]
-    public LevelDataSO currentLevelData;             // Bản tạm thời
+    public LevelDataSO currentLevelData;
 
     private bool isInEditMode = false;
 
-    // ==================== BUTTONS ====================
+
     [Button(" ENTER LIVE EDIT MODE", ButtonSizes.Large)]
 
     private void EnterLiveEditMode()
@@ -61,7 +62,7 @@ public class LeverManager : MonoBehaviour
             return;
         }
 
-        // Code lưu dữ liệu từ Scene vào currentLevelData
+
         currentLevelData.grid.Clear();
         Dictionary<Vector2Int, LevelDataSO.TileType> tileMap = new Dictionary<Vector2Int, LevelDataSO.TileType>();
         int maxX = 0, maxY = 0;
@@ -116,7 +117,7 @@ public class LeverManager : MonoBehaviour
         Debug.Log("Đã khôi phục về bản gốc");
     }
 
-    // ==================== TẠO CLONE ====================
+
     private void CreateCurrentLevelDataClone()
     {
         currentLevelData = ScriptableObject.CreateInstance<LevelDataSO>();
@@ -148,13 +149,27 @@ public class LeverManager : MonoBehaviour
     private void GenerateLevel()
     {
         ClearChildren();
-        if (levelData == null) return;
-        for (int i = 0; i < levelData.grid.Count; i++)
-            for (int j = 0; j < levelData.grid[i].tiles.Count; j++)
-                SpawnTile(levelData.grid[i].tiles[j], j, i);
+
+        LevelDataSO dataToUse = currentLevelData != null && isInEditMode ? currentLevelData : levelData;
+
+        if (dataToUse == null)
+        {
+            Debug.LogError("Không có LevelData để generate!");
+            return;
+        }
+
+        for (int i = 0; i < dataToUse.grid.Count; i++)
+        {
+            for (int j = 0; j < dataToUse.grid[i].tiles.Count; j++)
+            {
+                SpawnTile(dataToUse.grid[i].tiles[j], j, i);
+            }
+        }
 
         SpawnPlayer();
+        Debug.Log($"Generate level thành công từ {(currentLevelData != null && isInEditMode ? "CurrentLevelData (đã chỉnh sửa)" : "Original LevelData")}");
     }
+
 
     private void SpawnTile(LevelDataSO.TileType tile, int x, int y)
     {
@@ -171,15 +186,24 @@ public class LeverManager : MonoBehaviour
     {
         switch (type)
         {
-            case LevelDataSO.TileType.Wall: return WallPreb;
-            case LevelDataSO.TileType.Finish: return FinishPreb;
-            case LevelDataSO.TileType.Coin: return CoinPreb;
-            case LevelDataSO.TileType.NeedCoin: return NeedCoinPreb;
-            case LevelDataSO.TileType.RedirectUpRight: return RedirectUpRightPreb;
-            case LevelDataSO.TileType.RedirectDownLeft: return RedirectDownLeftPreb;
-            case LevelDataSO.TileType.RedirectUpLeft: return RedirectUpLeftPrep;
-            case LevelDataSO.TileType.RedirectDownRight: return RedirectDownRightPreb;
-            default: return EmptyPreb;
+            case LevelDataSO.TileType.Wall:
+                return WallPreb;
+            case LevelDataSO.TileType.Finish:
+                return FinishPreb;
+            case LevelDataSO.TileType.Coin:
+                return CoinPreb;
+            case LevelDataSO.TileType.NeedCoin:
+                return NeedCoinPreb;
+            case LevelDataSO.TileType.RedirectUpRight:
+                return RedirectUpRightPreb;
+            case LevelDataSO.TileType.RedirectDownLeft:
+                return RedirectDownLeftPreb;
+            case LevelDataSO.TileType.RedirectUpLeft:
+                return RedirectUpLeftPrep;
+            case LevelDataSO.TileType.RedirectDownRight:
+                return RedirectDownRightPreb;
+            default:
+                return EmptyPreb;
         }
     }
 
@@ -227,4 +251,33 @@ public class LeverManager : MonoBehaviour
             DestroyImmediate(transform.GetChild(0).gameObject);
     }
 
+     public void ReplaceTile(Vector2Int pos, LevelDataSO.TileType newType)
+    {
+        foreach (Transform child in transform)
+        {
+            if (child.name == "Player") continue;
+
+            Vector3 localPos = child.localPosition;
+            int x = Mathf.RoundToInt(localPos.x / spacing);
+            int y = Mathf.RoundToInt(localPos.z / spacing);
+
+            if (x == pos.x && y == pos.y)
+            {
+                DestroyImmediate(child.gameObject);
+
+                GameObject prefab = GetPrefabByType(newType);
+                if (prefab == null)
+                    return;
+                GameObject newObj = (GameObject)PrefabUtility.InstantiatePrefab(prefab);
+                newObj.transform.SetParent(transform);
+                newObj.transform.localPosition = new Vector3(x * spacing, 0, y * spacing);
+
+                newObj.name = $"Tile {y} , {x}";
+                Debug.Log($" replace success");
+                return;
+
+
+            }
+        }
+    }
 }
