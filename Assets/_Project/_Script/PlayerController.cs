@@ -1,78 +1,102 @@
-﻿using System.Collections.Generic;
+﻿using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 
 public class PlayerController : MonoBehaviour
 {
+    public LevelDataSO levelData;
+    public LeverManager leverManager;
     public float cellSize = 1.2f;
     public Vector2Int gridPos;
     public int Coin = 0;
-    public LevelDataSO levelData;
-    public LeverManager leverManager;           
+
+    public float timePerTile = 0.12f;
+
+    private bool isMoving = false;
+
     public HashSet<Vector2Int> usedTiles = new HashSet<Vector2Int>();
 
     void Start()
     {
         UpdateWorldPosition();
 
-       
         if (leverManager == null)
         {
             leverManager = FindObjectOfType<LeverManager>();
-            if (leverManager == null)
-                Debug.LogError(" Không tìm thấy LeverManager trong scene!");
-            else
-                Debug.Log(" Đã tìm thấy LeverManager");
         }
     }
+
 
     void Update()
     {
-        if (levelData == null) return;
+        if (isMoving || levelData == null) return;
 
-        Vector2Int move = Vector2Int.zero;
-        if (Input.GetKeyDown(KeyCode.W) || Input.GetKeyDown(KeyCode.UpArrow)) move = new Vector2Int(0, 1);
-        if (Input.GetKeyDown(KeyCode.S) || Input.GetKeyDown(KeyCode.DownArrow)) move = new Vector2Int(0, -1);
-        if (Input.GetKeyDown(KeyCode.A) || Input.GetKeyDown(KeyCode.LeftArrow)) move = new Vector2Int(-1, 0);
-        if (Input.GetKeyDown(KeyCode.D) || Input.GetKeyDown(KeyCode.RightArrow)) move = new Vector2Int(1, 0);
+        Vector2Int moveDir = Vector2Int.zero;
 
-        if (move != Vector2Int.zero)
+        if (Input.GetKeyDown(KeyCode.W) || Input.GetKeyDown(KeyCode.UpArrow)) moveDir = new Vector2Int(0, 1);
+        if (Input.GetKeyDown(KeyCode.S) || Input.GetKeyDown(KeyCode.DownArrow)) moveDir = new Vector2Int(0, -1);
+        if (Input.GetKeyDown(KeyCode.A) || Input.GetKeyDown(KeyCode.LeftArrow)) moveDir = new Vector2Int(-1, 0);
+        if (Input.GetKeyDown(KeyCode.D) || Input.GetKeyDown(KeyCode.RightArrow)) moveDir = new Vector2Int(1, 0);
+
+        if (moveDir != Vector2Int.zero)
         {
-            Vector2Int targetPos = GetFarthestPointAndCollect(gridPos, move);
-            if (targetPos != gridPos)
-            {
-                gridPos = targetPos;
-                UpdateWorldPosition();
-                Debug.Log($"Moved to: {gridPos} | Coins: {Coin}");
-            }
-            else
-            {
-                Debug.Log("Blocked by wall or need coin");
-            }
+            StartCoroutine(MoveWithTime(moveDir));
         }
     }
 
-    Vector2Int GetFarthestPointAndCollect(Vector2Int startPos, Vector2Int direction)
+
+    private IEnumerator MoveWithTime(Vector2Int direction)
     {
-        Vector2Int current = startPos;
+        isMoving = true;
+
+        Vector2Int current = gridPos;
+        Vector2Int currentDir = direction;
+
         while (true)
         {
-            Vector2Int next = current + direction;
+            Vector2Int next = current + currentDir;
+
             if (!IsWithinBounds(next)) break;
-
-            LevelDataSO.TileType tile = levelData.grid[next.y].tiles[next.x];
-
-            if (tile == LevelDataSO.TileType.Wall) break;
+            if (levelData.grid[next.y].tiles[next.x] == LevelDataSO.TileType.Wall) break;
+            if (levelData.grid[next.y].tiles[next.x] == LevelDataSO.TileType.NeedCoin &&
+                !usedTiles.Contains(next) && Coin <= 0)
+            {
+                break;
+            }
 
             current = next;
-            direction = ProcessTile(current, direction);
+            gridPos = current;
+            UpdateWorldPosition();
 
-            if (tile == LevelDataSO.TileType.Finish) break;
+            currentDir = ProcessTile(current, currentDir);
 
-            if (tile == LevelDataSO.TileType.NeedCoin && !usedTiles.Contains(next) && Coin <= 0)
+
+            yield return new WaitForSeconds(timePerTile);
+
+            if (levelData.grid[current.y].tiles[current.x] == LevelDataSO.TileType.Finish)
+            {
+                Debug.Log(" YOU WIN!");
                 break;
+            }
         }
-        return current;
+
+        isMoving = false;
+        Debug.Log($"Di chuyển hoàn tất! Vị trí cuối: {gridPos} | Coins: {Coin}");
     }
+
+
+    public float GetTimePerTile()
+    {
+        return timePerTile;
+    }
+
+
+    public float GetTimeForTiles(int numberOfTiles)
+    {
+        if (numberOfTiles <= 0) return 0f;
+        return numberOfTiles * timePerTile;
+    }
+
 
     Vector2Int ProcessTile(Vector2Int pos, Vector2Int currentDirection)
     {
@@ -92,24 +116,13 @@ public class PlayerController : MonoBehaviour
                 break;
 
             case LevelDataSO.TileType.NeedCoin:
-                if (!usedTiles.Contains(pos))
+                if (!usedTiles.Contains(pos) && Coin > 0)
                 {
-                    if (Coin > 0)
-                    {
-                        Coin--;
-                        usedTiles.Add(pos);
-                        Debug.Log($"Used 1 Coin at {pos}. Remaining: {Coin}");
-                        ChangeNeedCoinToNone(pos);        
-                    }
-                    else
-                    {
-                        Debug.Log("Need a coin to pass!");
-                    }
+                    Coin--;
+                    usedTiles.Add(pos);
+                    Debug.Log($"Used 1 Coin at {pos}. Remaining: {Coin}");
+                    ChangeNeedCoinToNone(pos);
                 }
-                break;
-
-            case LevelDataSO.TileType.Finish:
-                Debug.Log(" YOU WIN!");
                 break;
 
             case LevelDataSO.TileType.RedirectUpRight:
@@ -128,7 +141,6 @@ public class PlayerController : MonoBehaviour
     {
         if (levelData == null || levelData.grid == null || levelData.grid.Count == 0)
             return false;
-
         return pos.x >= 0 && pos.x < levelData.grid[0].tiles.Count &&
                pos.y >= 0 && pos.y < levelData.grid.Count;
     }
@@ -142,23 +154,19 @@ public class PlayerController : MonoBehaviour
     {
         if (levelData == null || !IsWithinBounds(pos)) return;
 
-        levelData.grid[pos.y].tiles[pos.x] = LevelDataSO.TileType.None;
+        LevelDataSO targetData = (leverManager != null && leverManager.isInEditMode && leverManager.currentLevelData != null)
+            ? leverManager.currentLevelData : levelData;
+
+        targetData.grid[pos.y].tiles[pos.x] = LevelDataSO.TileType.None;
 
         if (leverManager != null)
-        {
             leverManager.ReplaceTile(pos, LevelDataSO.TileType.None);
-            if (leverManager.currentLevelData != null)
-            {
-                leverManager.currentLevelData.grid[pos.y].tiles[pos.x] = LevelDataSO.TileType.None;
-            }
-            Debug.LogWarning("leverManager is null - Cannot update visual");
-        }
-        Debug.Log($"NeedCoin tại {pos} → None (đã đồng bộ data)");
     }
 
     public void ResetState()
     {
         Coin = 0;
         usedTiles.Clear();
+        isMoving = false;          // ← THÊM: Reset trạng thái isMoving
     }
 }

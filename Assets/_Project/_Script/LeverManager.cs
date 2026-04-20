@@ -31,7 +31,7 @@ public class LeverManager : MonoBehaviour
     [Title("Current Level Data (Đang chỉnh sửa)")]
     public LevelDataSO currentLevelData;
 
-    private bool isInEditMode = false;
+    public bool isInEditMode = false;
 
 
     [Button(" ENTER LIVE EDIT MODE", ButtonSizes.Large)]
@@ -52,60 +52,41 @@ public class LeverManager : MonoBehaviour
         Debug.Log(" ĐÃ VÀO LIVE EDIT MODE - Sử dụng currentLevelData");
     }
 
-    [Button(" SAVE SCENE → CurrentLevelData", ButtonSizes.Large)]
-
-    private void SaveToCurrentLevelData()
+    [Button(" SAVE RUNTIME CHANGES → CurrentLevelData")]
+    private void SaveRuntimeChangesToCurrent()
     {
-        if (currentLevelData == null || !isInEditMode)
+        if (!isInEditMode || currentLevelData == null)
         {
-            Debug.LogError("Phải vào Live Edit Mode trước khi Save!");
+            Debug.LogError("Phải vào Live Edit Mode trước!");
             return;
         }
 
+        if (levelData == null) return;
 
-        currentLevelData.grid.Clear();
-        Dictionary<Vector2Int, LevelDataSO.TileType> tileMap = new Dictionary<Vector2Int, LevelDataSO.TileType>();
-        int maxX = 0, maxY = 0;
-
-        foreach (Transform child in transform)
+        // Đồng bộ toàn bộ grid
+        int rows = Mathf.Min(levelData.grid.Count, currentLevelData.grid.Count);
+        for (int y = 0; y < rows; y++)
         {
-            if (child.name == "Player") continue;
-
-            Vector3 pos = child.localPosition;
-            int x = Mathf.RoundToInt(pos.x / spacing);
-            int y = Mathf.RoundToInt(pos.z / spacing);
-
-            LevelDataSO.TileType type = GetTileTypeFromObject(child.gameObject);
-            tileMap[new Vector2Int(x, y)] = type;
-
-            maxX = Mathf.Max(maxX, x);
-            maxY = Mathf.Max(maxY, y);
-        }
-
-        for (int y = 0; y <= maxY; y++)
-        {
-            LevelDataSO.Row row = new LevelDataSO.Row();
-            for (int x = 0; x <= maxX; x++)
+            int cols = Mathf.Min(levelData.grid[y].tiles.Count, currentLevelData.grid[y].tiles.Count);
+            for (int x = 0; x < cols; x++)
             {
-                Vector2Int p = new Vector2Int(x, y);
-                row.tiles.Add(tileMap.ContainsKey(p) ? tileMap[p] : LevelDataSO.TileType.None);
+                currentLevelData.grid[y].tiles[x] = levelData.grid[y].tiles[x];
             }
-            currentLevelData.grid.Add(row);
         }
 
-        // Lưu Player Position
+        // Đồng bộ Player Pos
         Transform playerT = transform.Find("Player");
         if (playerT != null)
         {
-            Vector3 pPos = playerT.localPosition;
+            Vector3 p = playerT.localPosition;
             currentLevelData.PlayerPos = new Vector2(
-                Mathf.RoundToInt(pPos.x / spacing),
-                Mathf.RoundToInt(pPos.z / spacing)
+                Mathf.RoundToInt(p.x / spacing),
+                Mathf.RoundToInt(p.z / spacing)
             );
         }
 
         EditorUtility.SetDirty(currentLevelData);
-        Debug.Log($" SAVE THÀNH CÔNG! Level size: {maxX + 1} x {maxY + 1}");
+        Debug.Log(" ĐÃ LƯU THÀNH CÔNG  vào CurrentLevelData!");
     }
 
     [Button("↩️ Revert to Original LevelData")]
@@ -150,24 +131,25 @@ public class LeverManager : MonoBehaviour
     {
         ClearChildren();
 
-        LevelDataSO dataToUse = currentLevelData != null && isInEditMode ? currentLevelData : levelData;
+        LevelDataSO dataToUse = (isInEditMode && currentLevelData != null) ? currentLevelData : levelData;
 
         if (dataToUse == null)
         {
-            Debug.LogError("Không có LevelData để generate!");
+            Debug.LogError("Không có dữ liệu level!");
             return;
         }
 
-        for (int i = 0; i < dataToUse.grid.Count; i++)
+        Debug.Log($"Đang generate từ: {(isInEditMode && currentLevelData != null ? "CURRENT LEVEL DATA" : "LevelData gốc")}");
+
+        for (int y = 0; y < dataToUse.grid.Count; y++)
         {
-            for (int j = 0; j < dataToUse.grid[i].tiles.Count; j++)
+            for (int x = 0; x < dataToUse.grid[y].tiles.Count; x++)
             {
-                SpawnTile(dataToUse.grid[i].tiles[j], j, i);
+                SpawnTile(dataToUse.grid[y].tiles[x], x, y);
             }
         }
 
         SpawnPlayer();
-        Debug.Log($"Generate level thành công từ {(currentLevelData != null && isInEditMode ? "CurrentLevelData (đã chỉnh sửa)" : "Original LevelData")}");
     }
 
 
@@ -251,7 +233,7 @@ public class LeverManager : MonoBehaviour
             DestroyImmediate(transform.GetChild(0).gameObject);
     }
 
-     public void ReplaceTile(Vector2Int pos, LevelDataSO.TileType newType)
+    public void ReplaceTile(Vector2Int pos, LevelDataSO.TileType newType)
     {
         foreach (Transform child in transform)
         {
