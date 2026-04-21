@@ -34,7 +34,7 @@ public class LeverManager : MonoBehaviour
     public bool isInEditMode = false;
 
 
-    [Button(" ENTER LIVE EDIT MODE", ButtonSizes.Large)]
+    [Button(" ENTER LIVE EDIT MODE")]
 
     private void EnterLiveEditMode()
     {
@@ -89,7 +89,7 @@ public class LeverManager : MonoBehaviour
         Debug.Log(" ĐÃ LƯU THÀNH CÔNG  vào CurrentLevelData!");
     }
 
-    [Button("↩️ Revert to Original LevelData")]
+    [Button(" Revert to Original LevelData")]
     private void RevertToOriginal()
     {
         currentLevelData = null;
