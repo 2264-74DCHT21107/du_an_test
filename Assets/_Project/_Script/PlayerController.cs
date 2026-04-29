@@ -1,20 +1,17 @@
 ﻿using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.UIElements;
 
 public class PlayerController : MonoBehaviour
 {
  
     public LevelDataSO levelData;
     public LeverManager leverManager;
-
     public float cellSize = 1.2f;
     public float timePerTile = 0.25f;
-
     public Vector2Int gridPos;
     public int Coin = 0;
     public Vector2Int moveDirection = Vector2Int.zero;
-    
-
     private bool isMoving = false;
     private float timer = 0f;
 
@@ -24,6 +21,8 @@ public class PlayerController : MonoBehaviour
 
         if (leverManager == null)
             leverManager = FindObjectOfType<LeverManager>();
+
+        
     }
 
     void Update()
@@ -43,15 +42,15 @@ public class PlayerController : MonoBehaviour
             return;
         }
 
-        Vector2Int inputDir = Vector2Int.zero;
-        if (Input.GetKeyDown(KeyCode.W) || Input.GetKeyDown(KeyCode.UpArrow)) inputDir = Vector2Int.up;
-        if (Input.GetKeyDown(KeyCode.S) || Input.GetKeyDown(KeyCode.DownArrow)) inputDir = Vector2Int.down;
-        if (Input.GetKeyDown(KeyCode.A) || Input.GetKeyDown(KeyCode.LeftArrow)) inputDir = Vector2Int.left;
-        if (Input.GetKeyDown(KeyCode.D) || Input.GetKeyDown(KeyCode.RightArrow)) inputDir = Vector2Int.right;
+        Vector2Int moveDir = Vector2Int.zero;
+        if (Input.GetKeyDown(KeyCode.W) || Input.GetKeyDown(KeyCode.UpArrow)) moveDir = new Vector2Int(0,1);
+        else if (Input.GetKeyDown(KeyCode.S) || Input.GetKeyDown(KeyCode.DownArrow)) moveDir = new Vector2Int(0,-1);
+        else if (Input.GetKeyDown(KeyCode.A) || Input.GetKeyDown(KeyCode.LeftArrow)) moveDir = new Vector2Int(-1,0);
+        else if (Input.GetKeyDown(KeyCode.D) || Input.GetKeyDown(KeyCode.RightArrow)) moveDir = new Vector2Int(1,0); 
 
-        if (inputDir != Vector2Int.zero)
+        if (moveDir != Vector2Int.zero)
         {
-            StartMoving(inputDir);
+            StartMoving(moveDir);
         }
     }
 
@@ -68,8 +67,7 @@ public class PlayerController : MonoBehaviour
         Vector2Int nextPos = gridPos + moveDirection;
 
     
-        if (!IsWithinBounds(nextPos) ||
-            levelData.grid[nextPos.y].tiles[nextPos.x] == LevelDataSO.TileType.Wall )
+        if (!IsWithinBounds(nextPos) || levelData.grid[nextPos.y].tiles[nextPos.x] == LevelDataSO.TileType.Wall )
         {
             StopMoving();
             return;
@@ -125,13 +123,13 @@ public class PlayerController : MonoBehaviour
                     break;
 
             case LevelDataSO.TileType.RedirectUpRight:
-                return currentDirection.x != 0 ? Vector2Int.up : Vector2Int.right;
+                return currentDirection.x != 0 ? new Vector2Int(0,1) : new Vector2Int(1,0);
             case LevelDataSO.TileType.RedirectDownLeft:
-                return currentDirection.x != 0 ? Vector2Int.down : Vector2Int.left;
+                return currentDirection.x != 0 ? new Vector2Int(0,-1) : new Vector2Int(-1,0);
             case LevelDataSO.TileType.RedirectUpLeft:
-                return currentDirection.x != 0 ? Vector2Int.up : Vector2Int.left;
+                return currentDirection.x != 0 ? new Vector2Int(0,1) : new Vector2Int(1,0);
             case LevelDataSO.TileType.RedirectDownRight:
-                return currentDirection.x != 0 ? Vector2Int.down : Vector2Int.right;
+                return currentDirection.x != 0 ? new Vector2Int(0,-1) : new Vector2Int(1,0);
         }
 
         return currentDirection;
@@ -148,39 +146,29 @@ public class PlayerController : MonoBehaviour
 
     void UpdateWorldPosition()
     {
+       
         transform.position = new Vector3(gridPos.x * cellSize, 0f, gridPos.y * cellSize);
+
+    
     }
-    //void ChangeCoinToNone(Vector2Int pos)
-    //{
-    //    if (levelData == null || !IsWithinBounds(pos)) return;
-    //    LevelDataSO targetData = (leverManager != null && leverManager.isInEditMode && leverManager.currentLevelData != null)
-    //        ? leverManager.currentLevelData : levelData;
-    //    targetData.grid[pos.y].tiles[pos.x] = LevelDataSO.TileType.None;
 
-    //    if (leverManager != null)
-    //        leverManager.ReplaceTile(pos, LevelDataSO.TileType.None);
-    //}
     void ChangeTilesToNone(Vector2Int pos)
-
     {
         if (levelData == null || !IsWithinBounds(pos)) return;
-
         LevelDataSO targetData = (leverManager != null && leverManager.isInEditMode && leverManager.currentLevelData != null)
             ? leverManager.currentLevelData : levelData;
-
         targetData.grid[pos.y].tiles[pos.x] = LevelDataSO.TileType.None;
 
         if (leverManager != null)
             leverManager.ReplaceTile(pos, LevelDataSO.TileType.None);
     }
-
     void StopMoving()
     {
         isMoving = false;
         timer = 0f;
         Debug.Log($"Dừng di chuyển tại {gridPos}");
     }
-
+   
     public void ResetState()
     {
         Coin = 0;

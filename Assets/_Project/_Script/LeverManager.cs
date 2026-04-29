@@ -224,6 +224,9 @@ public class LeverManager : MonoBehaviour
             PlayerController.levelData = dataToUse;
             PlayerController.gridPos = new Vector2Int((int)dataToUse.PlayerPos.x, (int)dataToUse.PlayerPos.y);
         }
+
+
+        
     }
 
     [Button("Clear Level")]
