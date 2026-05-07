@@ -1,135 +1,175 @@
-﻿using System.Collections.Generic;
+﻿using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.UIElements;
+using UnityEngine.SceneManagement;
 
 public class PlayerController : MonoBehaviour
 {
- 
     public LevelDataSO levelData;
     public LeverManager leverManager;
+
+    [Header("Movement Settings")]
     public float cellSize = 1.2f;
     public float timePerTile = 0.25f;
+
     public Vector2Int gridPos;
     public int Coin = 0;
-    public Vector2Int moveDirection = Vector2Int.zero;
+
+    private Vector2Int moveDirection = Vector2Int.zero;
     private bool isMoving = false;
     private float timer = 0f;
 
+    private Vector3 startPos;
+    private Vector3 targetPos;
+    private Vector2Int nextGridPos;
+
     void Start()
     {
-        UpdateWorldPosition();
+        UpdateWorldPositionInstant();
 
         if (leverManager == null)
             leverManager = FindObjectOfType<LeverManager>();
-
-        
     }
 
     void Update()
     {
-       
-        if (isMoving || levelData == null)
-        {
+        if (levelData == null) return;
+
         
-            if (isMoving)
-            {
-                timer += Time.deltaTime;
-                if (timer >= timePerTile)
-                {
-                    MoveOneStep();
-                }
-            }
-            return;
+        if (!isMoving)
+        {
+            Vector2Int moveDir = Vector2Int.zero;
+
+            if (Input.GetKeyDown(KeyCode.W) || Input.GetKeyDown(KeyCode.UpArrow)) moveDir = Vector2Int.up;
+            else if (Input.GetKeyDown(KeyCode.S) || Input.GetKeyDown(KeyCode.DownArrow)) moveDir = Vector2Int.down;
+            else if (Input.GetKeyDown(KeyCode.A) || Input.GetKeyDown(KeyCode.LeftArrow)) moveDir = Vector2Int.left;
+            else if (Input.GetKeyDown(KeyCode.D) || Input.GetKeyDown(KeyCode.RightArrow)) moveDir = Vector2Int.right;
+
+            if (moveDir != Vector2Int.zero)
+                StartMoving(moveDir);
         }
 
-        Vector2Int moveDir = Vector2Int.zero;
-        if (Input.GetKeyDown(KeyCode.W) || Input.GetKeyDown(KeyCode.UpArrow)) moveDir = new Vector2Int(0,1);
-        else if (Input.GetKeyDown(KeyCode.S) || Input.GetKeyDown(KeyCode.DownArrow)) moveDir = new Vector2Int(0,-1);
-        else if (Input.GetKeyDown(KeyCode.A) || Input.GetKeyDown(KeyCode.LeftArrow)) moveDir = new Vector2Int(-1,0);
-        else if (Input.GetKeyDown(KeyCode.D) || Input.GetKeyDown(KeyCode.RightArrow)) moveDir = new Vector2Int(1,0); 
-
-        if (moveDir != Vector2Int.zero)
+        
+        if (isMoving)
         {
-            StartMoving(moveDir);
+            timer += Time.deltaTime;
+            float t = Mathf.Clamp01(timer / timePerTile);
+
+            transform.localPosition = Vector3.Lerp(startPos, targetPos, t);
+
+            if (timer >= timePerTile)
+                MoveOneStep();
         }
     }
 
     void StartMoving(Vector2Int dir)
     {
         moveDirection = dir;
+        nextGridPos = gridPos + dir;
+
+        if (!IsWithinBounds(nextGridPos) ||
+            levelData.grid[nextGridPos.y].tiles[nextGridPos.x] == LevelDataSO.TileType.Wall)
+        {
+            StopMoving();
+            return;
+        }
+
         isMoving = true;
         timer = 0f;
-        MoveOneStep();      
+
+        startPos = transform.localPosition;
+        targetPos = GridToLocal(nextGridPos);
     }
 
     void MoveOneStep()
     {
-        Vector2Int nextPos = gridPos + moveDirection;
+        gridPos = nextGridPos;
 
-    
-        if (!IsWithinBounds(nextPos) || levelData.grid[nextPos.y].tiles[nextPos.x] == LevelDataSO.TileType.Wall )
-        {
-            StopMoving();
-            return;
-        }
-
-      
-        gridPos = nextPos;
-        UpdateWorldPosition();
+        
+        transform.localPosition = GridToLocal(gridPos);
 
         moveDirection = ProcessTile(gridPos, moveDirection);
 
+        
         if (levelData.grid[gridPos.y].tiles[gridPos.x] == LevelDataSO.TileType.Finish)
         {
             Debug.Log("YOU WIN!");
-            StopMoving();
+            TeleToNextLevel();
             return;
         }
 
-      
+        if (moveDirection != Vector2Int.zero)
+        {
+            nextGridPos = gridPos + moveDirection;
+
+            if (!IsWithinBounds(nextGridPos) ||
+                levelData.grid[nextGridPos.y].tiles[nextGridPos.x] == LevelDataSO.TileType.Wall)
+            {
+                StopMoving();
+                return;
+            }
+
+            startPos = transform.localPosition;
+            targetPos = GridToLocal(nextGridPos);
+            timer = 0f;
+        }
+        else
+        {
+            StopMoving();
+        }
+    }
+
+    void StopMoving()
+    {
+        if (!isMoving) return;
+
+        isMoving = false;
         timer = 0f;
+        moveDirection = Vector2Int.zero;
+
+        Debug.Log($"Dừng tại {gridPos}");
     }
 
     Vector2Int ProcessTile(Vector2Int pos, Vector2Int currentDirection)
     {
         if (!IsWithinBounds(pos)) return currentDirection;
 
-        LevelDataSO.TileType tileType = levelData.grid[pos.y].tiles[pos.x];
+        var tileType = levelData.grid[pos.y].tiles[pos.x];
 
         switch (tileType)
         {
             case LevelDataSO.TileType.Coin:
                 Coin++;
                 Debug.Log($"Coin: {Coin}");
-                if (leverManager == null || !leverManager.isInEditMode)
-                {
-                    ChangeTilesToNone(pos);
-                }
-                
+                ChangeTilesToNone(pos);
                 break;
 
             case LevelDataSO.TileType.NeedCoin:
                 if (Coin > 0)
                 {
                     Coin--;
-                    Debug.Log($"Used 1 coin . Remaining {Coin}");
+                    Debug.Log($"Used coin, còn {Coin}");
                     ChangeTilesToNone(pos);
-                } 
+                }
                 else
                 {
-                    Debug.Log($"không đủ coin dừng lại tại {pos}");
+                    Debug.Log("Không đủ coin");
                     StopMoving();
+                    return Vector2Int.zero;
                 }
-                    break;
+                break;
 
             case LevelDataSO.TileType.RedirectUpRight:
-                return currentDirection.x != 0 ? new Vector2Int(0,1) : new Vector2Int(1,0);
+                return currentDirection.x != 0 ? Vector2Int.up : Vector2Int.right;
+
             case LevelDataSO.TileType.RedirectDownLeft:
-                return currentDirection.x != 0 ? new Vector2Int(0,-1) : new Vector2Int(-1,0);
+                return currentDirection.x != 0 ? Vector2Int.down : Vector2Int.left;
+
             case LevelDataSO.TileType.RedirectUpLeft:
-                return currentDirection.x != 0 ? new Vector2Int(0,1) : new Vector2Int(1,0);
+                return currentDirection.x != 0 ? Vector2Int.up : Vector2Int.left;
+
             case LevelDataSO.TileType.RedirectDownRight:
-                return currentDirection.x != 0 ? new Vector2Int(0,-1) : new Vector2Int(1,0);
+                return currentDirection.x != 0 ? Vector2Int.down : Vector2Int.right;
         }
 
         return currentDirection;
@@ -144,38 +184,56 @@ public class PlayerController : MonoBehaviour
                pos.y >= 0 && pos.y < levelData.grid.Count;
     }
 
-    void UpdateWorldPosition()
+    void UpdateWorldPositionInstant()
     {
-       
-        transform.position = new Vector3(gridPos.x * cellSize, 0f, gridPos.y * cellSize);
+        transform.localPosition = GridToLocal(gridPos);
+    }
+
+    Vector3 GridToLocal(Vector2Int pos)
+    {
+        return new Vector3(pos.x * cellSize, 0f, pos.y * cellSize);
+    }
 
     
-    }
-
     void ChangeTilesToNone(Vector2Int pos)
     {
-        if (levelData == null || !IsWithinBounds(pos)) return;
-        LevelDataSO targetData = (leverManager != null && leverManager.isInEditMode && leverManager.currentLevelData != null)
-            ? leverManager.currentLevelData : levelData;
-        targetData.grid[pos.y].tiles[pos.x] = LevelDataSO.TileType.None;
+        if (!IsWithinBounds(pos)) return;
+
+        levelData.grid[pos.y].tiles[pos.x] = LevelDataSO.TileType.None;
 
         if (leverManager != null)
-            leverManager.ReplaceTile(pos, LevelDataSO.TileType.None);
+        {
+            GameObject tileObj = leverManager.GetTileObject(pos);
+
+            if (tileObj != null)
+            {
+                CoinEffect effect = tileObj.GetComponent<CoinEffect>();
+
+                if (effect != null)
+                {
+                    effect.PlayEffect();
+
+                    
+                    leverManager.ReplaceTile(pos, LevelDataSO.TileType.None);
+                }
+                else
+                {
+                    Destroy(tileObj);
+                    leverManager.ReplaceTile(pos, LevelDataSO.TileType.None);
+                }
+            }
+        }
     }
-    void StopMoving()
+
+    private void TeleToNextLevel()
     {
-        isMoving = false;
-        timer = 0f;
-        Debug.Log($"Dừng di chuyển tại {gridPos}");
+        StopMoving();
+        SceneManager.LoadScene(1);
     }
-   
+
     public void ResetState()
     {
         Coin = 0;
-
-        isMoving = false;
-        timer = 0f;
-        moveDirection = Vector2Int.zero;
-        Debug.Log("Player state reset.");
+        StopMoving();
     }
 }
