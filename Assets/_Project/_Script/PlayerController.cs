@@ -29,13 +29,15 @@ public class PlayerController : MonoBehaviour
 
         if (leverManager == null)
             leverManager = FindObjectOfType<LeverManager>();
+        if (leverManager != null)
+            cellSize = leverManager.spacing;
     }
 
     void Update()
     {
         if (levelData == null) return;
 
-        
+
         if (!isMoving)
         {
             Vector2Int moveDir = Vector2Int.zero;
@@ -49,7 +51,7 @@ public class PlayerController : MonoBehaviour
                 StartMoving(moveDir);
         }
 
-        
+
         if (isMoving)
         {
             timer += Time.deltaTime;
@@ -59,6 +61,14 @@ public class PlayerController : MonoBehaviour
 
             if (timer >= timePerTile)
                 MoveOneStep();
+        }
+        if (Input.GetKeyDown(KeyCode.R))
+        {
+            if (GameManager.Instance != null)
+                GameManager.Instance.RestartCurrentLevel();
+            else
+                SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
+
         }
     }
 
@@ -85,12 +95,12 @@ public class PlayerController : MonoBehaviour
     {
         gridPos = nextGridPos;
 
-        
+
         transform.localPosition = GridToLocal(gridPos);
 
         moveDirection = ProcessTile(gridPos, moveDirection);
 
-        
+
         if (levelData.grid[gridPos.y].tiles[gridPos.x] == LevelDataSO.TileType.Finish)
         {
             Debug.Log("YOU WIN!");
@@ -184,9 +194,10 @@ public class PlayerController : MonoBehaviour
                pos.y >= 0 && pos.y < levelData.grid.Count;
     }
 
-    void UpdateWorldPositionInstant()
+    public void UpdateWorldPositionInstant()
     {
-        transform.localPosition = GridToLocal(gridPos);
+        Vector3 correctPosition = new Vector3(gridPos.x * cellSize, 0f, gridPos.y * cellSize);
+        transform.localPosition = correctPosition;
     }
 
     Vector3 GridToLocal(Vector2Int pos)
@@ -194,7 +205,7 @@ public class PlayerController : MonoBehaviour
         return new Vector3(pos.x * cellSize, 0f, pos.y * cellSize);
     }
 
-    
+
     void ChangeTilesToNone(Vector2Int pos)
     {
         if (!IsWithinBounds(pos)) return;
@@ -213,7 +224,7 @@ public class PlayerController : MonoBehaviour
                 {
                     effect.PlayEffect();
 
-                    
+
                     leverManager.ReplaceTile(pos, LevelDataSO.TileType.None);
                 }
                 else
@@ -228,7 +239,12 @@ public class PlayerController : MonoBehaviour
     private void TeleToNextLevel()
     {
         StopMoving();
-        SceneManager.LoadScene(1);
+        Debug.Log("YOU WIN! Chuyển level...");
+
+        if (GameManager.Instance != null)
+            GameManager.Instance.NextLevel();
+        else
+            SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex + 1); // fallback
     }
 
     public void ResetState()

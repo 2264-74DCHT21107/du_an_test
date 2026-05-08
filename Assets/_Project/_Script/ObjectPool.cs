@@ -34,7 +34,7 @@ public class ObjectPool : MonoBehaviour
         InitializePools();
     }
 
-    
+
     private void InitializePools()
     {
         foreach (var item in poolItems)
@@ -71,7 +71,7 @@ public class ObjectPool : MonoBehaviour
 
         Queue<GameObject> poolQueue = pools[tag];
 
-     
+
         if (poolQueue.Count == 0)
         {
             PoolItem item = poolItems.Find(p => p.tag == tag);
@@ -86,25 +86,25 @@ public class ObjectPool : MonoBehaviour
 
         GameObject obj = poolQueue.Dequeue();
 
-       
-        obj.transform.position = position;
+
+        obj.transform.localPosition = position;
         obj.transform.rotation = rotation;
         obj.SetActive(true);
 
-       
+
         poolQueue.Enqueue(obj);
 
         return obj;
     }
 
-    
+
     public void ReturnToPool(GameObject obj, string tag)
     {
         if (obj == null) return;
 
         obj.SetActive(false);
         obj.transform.SetParent(transform);
-        obj.transform.localPosition = Vector3.zero;   
+        obj.transform.localPosition = Vector3.zero;
 
         if (pools.ContainsKey(tag))
         {
@@ -117,7 +117,7 @@ public class ObjectPool : MonoBehaviour
         }
     }
 
-    
+
     public void ClearAllPools()
     {
         foreach (var queue in pools.Values)

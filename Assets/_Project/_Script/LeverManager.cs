@@ -17,14 +17,19 @@ public class LeverManager : MonoBehaviour
     public GameObject RedirectDownLeftPreb;
     public GameObject RedirectUpLeftPrep;
     public GameObject RedirectDownRightPreb;
+    public ObjectPool ObjectPool;
     public float spacing = 1.2f;
+
     [Title("Level Data")]
     public LevelDataSO levelData;
+
     [ReadOnly]
     [ShowInInspector]
     [Title("Current Level Data (Đang chỉnh sửa)")]
     public LevelDataSO currentLevelData;
     public bool isInEditMode = false;
+    private List<LevelDataSO.Row> runtimeGrid = new List<LevelDataSO.Row>();
+
     [Button(" ENTER LIVE EDIT MODE")]
     private void EnterLiveEditMode()
     {
@@ -101,25 +106,28 @@ public class LeverManager : MonoBehaviour
         SpawnPlayer();
     }
     [Button("Generate Level From SO")]
-    private void GenerateLevel()
+    public void GenerateLevel()
     {
         ClearChildren();
-        LevelDataSO dataToUse = (isInEditMode && currentLevelData != null) ? currentLevelData : levelData;
-        if (dataToUse == null)
+        InitializeRuntimeGrid();
+
+        if (isInEditMode && currentLevelData != null)
         {
-            Debug.LogError("Không có dữ liệu level!");
-            return;
+            for (int y = 0; y < currentLevelData.grid.Count; y++)
+                for (int x = 0; x < currentLevelData.grid[y].tiles.Count; x++)
+                    SpawnTile(currentLevelData.grid[y].tiles[x], x, y);
         }
-        Debug.Log($"Đang generate từ: {(isInEditMode && currentLevelData != null ? "CURRENT LEVEL DATA" : "LevelData gốc")}");
-        for (int y = 0; y < dataToUse.grid.Count; y++)
+        else
         {
-            for (int x = 0; x < dataToUse.grid[y].tiles.Count; x++)
-            {
-                SpawnTile(dataToUse.grid[y].tiles[x], x, y);
-            }
+            for (int y = 0; y < runtimeGrid.Count; y++)
+                for (int x = 0; x < runtimeGrid[y].tiles.Count; x++)
+                    SpawnTile(runtimeGrid[y].tiles[x], x, y);
         }
+
         SpawnPlayer();
+        Debug.Log("Level Generated from Runtime Data");
     }
+
     private void SpawnTile(LevelDataSO.TileType tile, int x, int y)
     {
         Vector3 pos = new Vector3(x * spacing, 0, y * spacing);
@@ -128,40 +136,46 @@ public class LeverManager : MonoBehaviour
 
         if (Application.isPlaying && ObjectPool.Instance != null)
         {
-            obj = ObjectPool.Instance.Spawn(tile.ToString(), pos, Quaternion.identity);
-            obj.transform.SetParent(transform);
+            string tag = tile.ToString();
+
+            // ĐẶC BIỆT XỬ LÝ None → Empty
+            if (tile == LevelDataSO.TileType.None)
+                tag = "Empty";
+
+            obj = ObjectPool.Instance.Spawn(tag, pos, Quaternion.identity);
+
+            if (obj == null)
+            {
+                Debug.LogError($"Spawn thất bại: {tag}");
+                return;
+            }
         }
         else
         {
+            // Editor mode
             GameObject prefab = GetPrefabByType(tile);
             obj = (GameObject)PrefabUtility.InstantiatePrefab(prefab);
-            obj.transform.SetParent(transform);
             obj.transform.localPosition = pos;
         }
 
+        obj.transform.SetParent(transform);
+        obj.transform.localPosition = pos;
         obj.name = $"Tile_{y}_{x}";
     }
     private GameObject GetPrefabByType(LevelDataSO.TileType type)
     {
         switch (type)
         {
-            case LevelDataSO.TileType.Wall:
-                return WallPreb;
-            case LevelDataSO.TileType.Finish:
-                return FinishPreb;
-            case LevelDataSO.TileType.Coin:
-                return CoinPreb;
-            case LevelDataSO.TileType.NeedCoin:
-                return NeedCoinPreb;
-            case LevelDataSO.TileType.RedirectUpRight:
-                return RedirectUpRightPreb;
-            case LevelDataSO.TileType.RedirectDownLeft:
-                return RedirectDownLeftPreb;
-            case LevelDataSO.TileType.RedirectUpLeft:
-                return RedirectUpLeftPrep;
-            case LevelDataSO.TileType.RedirectDownRight:
-                return RedirectDownRightPreb;
-            default:
+            case LevelDataSO.TileType.Wall: return WallPreb;
+            case LevelDataSO.TileType.Finish: return FinishPreb;
+            case LevelDataSO.TileType.Coin: return CoinPreb;
+            case LevelDataSO.TileType.NeedCoin: return NeedCoinPreb;
+            case LevelDataSO.TileType.RedirectUpRight: return RedirectUpRightPreb;
+            case LevelDataSO.TileType.RedirectDownLeft: return RedirectDownLeftPreb;
+            case LevelDataSO.TileType.RedirectUpLeft: return RedirectUpLeftPrep;
+            case LevelDataSO.TileType.RedirectDownRight: return RedirectDownRightPreb;
+
+            default:                                  // None và các trường hợp khác
                 return EmptyPreb;
         }
     }
@@ -185,8 +199,11 @@ public class LeverManager : MonoBehaviour
         LevelDataSO dataToUse = currentLevelData != null ? currentLevelData : levelData;
         if (dataToUse == null) return;
         GameObject playerObj = (GameObject)PrefabUtility.InstantiatePrefab(Player);
-        playerObj.transform.SetParent(transform);
-        playerObj.transform.localPosition = new Vector3(dataToUse.PlayerPos.x * spacing, 0, dataToUse.PlayerPos.y * spacing);
+        playerObj.transform.SetParent(transform, false);
+        playerObj.transform.localPosition = new Vector3(
+            dataToUse.PlayerPos.x * spacing,
+            0,
+            dataToUse.PlayerPos.y * spacing);
         playerObj.name = "Player";
         PlayerController = playerObj.GetComponent<PlayerController>();
         if (PlayerController != null)
@@ -212,20 +229,34 @@ public class LeverManager : MonoBehaviour
         return null;
     }
     [Button("Clear Level")]
-    private void ClearChildren()
+    public  void ClearChildren()
     {
-        while (transform.childCount > 0)
+        if (ObjectPool.Instance != null && Application.isPlaying)
         {
-            GameObject obj = transform.GetChild(0).gameObject;
+            List<GameObject> tilesToReturn = new List<GameObject>();
 
-            if (ObjectPool.Instance != null)
-                ObjectPool.Instance.ReturnToPool(obj, GetTileTypeFromObject(obj).ToString());
-            else
-                DestroyImmediate(obj);
+            foreach (Transform child in transform)
+            {
+                if (child.name == "Player") continue;
+                tilesToReturn.Add(child.gameObject);
+            }
+
+            foreach (var tile in tilesToReturn)
+            {
+                string tag = GetTileTypeFromObject(tile).ToString();
+                ObjectPool.Instance.ReturnToPool(tile, tag);
+            }
+        }
+        else
+        {
+            while (transform.childCount > 0)
+                DestroyImmediate(transform.GetChild(0).gameObject);
         }
     }
     public void ReplaceTile(Vector2Int pos, LevelDataSO.TileType newType)
     {
+        // 1. Tìm và trả tile cũ về Pool
+        GameObject oldTile = null;
         foreach (Transform child in transform)
         {
             if (child.name == "Player") continue;
@@ -235,14 +266,76 @@ public class LeverManager : MonoBehaviour
 
             if (x == pos.x && y == pos.y)
             {
-                if (ObjectPool.Instance != null)
-                    ObjectPool.Instance.ReturnToPool(child.gameObject, GetTileTypeFromObject(child.gameObject).ToString());
-                else
-                    DestroyImmediate(child.gameObject);
-
-                SpawnTile(newType, x, y);
-                return;
+                oldTile = child.gameObject;
+                break;
             }
         }
+
+        if (oldTile != null)
+        {
+            string oldTag = GetTileTypeFromObject(oldTile).ToString();
+            if (ObjectPool.Instance != null)
+                ObjectPool.Instance.ReturnToPool(oldTile, oldTag);
+            else
+                DestroyImmediate(oldTile);
+        }
+
+        // 2. LUÔN spawn tile mới, kể cả khi là None (Empty)
+        SpawnTile(newType, pos.x, pos.y);
+    }
+    private void InitializeRuntimeGrid()
+    {
+        if (levelData == null) return;
+
+        runtimeGrid.Clear();
+        foreach (var row in levelData.grid)
+        {
+            LevelDataSO.Row newRow = new LevelDataSO.Row();
+            newRow.tiles.AddRange(row.tiles);
+            runtimeGrid.Add(newRow);
+        }
+    }
+
+    [Button("Reset To Original (Fix Coin/NeedCoin)")]
+    public void ResetToOriginalData()
+    {
+        ClearChildren();
+        InitializeRuntimeGrid();
+
+        if (isInEditMode && currentLevelData != null)
+        {
+            // Edit Mode thì dùng currentLevelData
+            for (int y = 0; y < currentLevelData.grid.Count; y++)
+            {
+                for (int x = 0; x < currentLevelData.grid[y].tiles.Count; x++)
+                {
+                    SpawnTile(currentLevelData.grid[y].tiles[x], x, y);
+                }
+            }
+        }
+        else
+        {
+            // Play Mode thì dùng runtimeGrid
+            for (int y = 0; y < runtimeGrid.Count; y++)
+            {
+                for (int x = 0; x < runtimeGrid[y].tiles.Count; x++)
+                {
+                    SpawnTile(runtimeGrid[y].tiles[x], x, y);
+                }
+            }
+        }
+
+        SpawnPlayer();
+
+        // Reset Player
+        if (PlayerController != null)
+            PlayerController.ResetState();
+        else
+        {
+            PlayerController pc = FindObjectOfType<PlayerController>();
+            if (pc != null) pc.ResetState();
+        }
+
+        Debug.Log(" RESET LEVEL THÀNH CÔNG - Coin & NeedCoin đã khôi phục!");
     }
 }

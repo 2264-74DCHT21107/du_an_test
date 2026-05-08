@@ -42,14 +42,14 @@ public class CoinEffect : MonoBehaviour
         {
             float t = time / duration;
 
-            
+
             float scaleValue = scaleCurve != null ? scaleCurve.Evaluate(t) : (1 - t);
             transform.localScale = startScale * scaleValue;
 
-            
+
             transform.position = startPos + Vector3.up * (moveUpDistance * t);
 
-           
+
             if (mat != null)
             {
                 float alpha = alphaCurve != null ? alphaCurve.Evaluate(t) : (1 - t);
